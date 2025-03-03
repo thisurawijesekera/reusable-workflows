@@ -74,7 +74,7 @@ jobs:
 
   TerraformAction:
     name: Run Terraform Action ${{ inputs.ACTION }} 
-    runs-on: dim-dsre-runner-prod
+    runs-on: ubuntu-latest
     needs: 
       - EnvSetup    
     environment:
