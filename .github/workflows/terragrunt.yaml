@@ -1,0 +1,222 @@
+name: DSRE Terraform Action
+
+on:
+  workflow_call:
+    inputs:
+      AWS_ACCOUNT_PROD:
+        description: 'TS AWS Prod Account number'
+        required: true
+        type: string
+      AWS_ACCOUNT_NP:
+        description: 'TS AWS Non Prod Account number'
+        required: true
+        type: string        
+      AWS_REGION:
+        description: 'TS AWS Region'
+        required: true
+        type: string            
+      AWS_REGION_DR:   
+        description: 'TS AWS DR Region'
+        required: true
+        type: string     
+      AWS_ASSUME_ROLE:
+        description: 'TS AWS assume role'
+        required: true
+        type: string           
+      ACTION:
+        description: 'Terraform Action Plan or Apply'
+        required: true
+        type: string    
+        
+env: 
+  TERRAFORM_VERSION: 1.6.5
+  TERRAGRUNT_VERSION: 0.53.8
+  
+jobs:
+  EnvSetup:
+    name: Set Environment variables 
+    runs-on: ubuntu-latest
+    outputs:
+      AWS_ACCOUNT: ${{ steps.set-env.outputs.AWS_ACCOUNT }}
+      AWS_REGION: ${{ steps.set-env.outputs.AWS_REGION }}
+      ENVIRONMENT: ${{ steps.set-env.outputs.ENVIRONMENT }}
+      GH_ENVIRONMENT: ${{ steps.set-env.outputs.GH_ENVIRONMENT }}
+    steps:
+    - name: Set Environment variables Production
+      if: ${{ contains(github.event.pull_request.labels.*.name, 'Environment::Production') }}
+      run: |
+        echo "ENVIRONMENT=prod" >> $GITHUB_ENV
+        echo "GH_ENVIRONMENT=Production" >> $GITHUB_ENV
+
+    - name: Set Environment variables NonProduction
+      if: ${{ contains(github.event.pull_request.labels.*.name, 'Environment::NonProduction') }}
+      run: |
+        echo "ENVIRONMENT=nonprod" >> $GITHUB_ENV
+        echo "GH_ENVIRONMENT=NonProduction" >> $GITHUB_ENV
+
+    - name: Set Default Environment variables
+      id: set-env
+      run: |
+
+        if [[ ${{ env.ENVIRONMENT }} =~ ^(nonprod)$ ]]; then
+          echo "AWS_ACCOUNT=${{ inputs.AWS_ACCOUNT_NP }}" >> $GITHUB_OUTPUT
+          echo "AWS_REGION=${{ inputs.AWS_REGION }}" >> $GITHUB_OUTPUT
+          echo "ENVIRONMENT=${{ env.ENVIRONMENT }}" >> $GITHUB_OUTPUT
+          echo "GH_ENVIRONMENT=${{ env.GH_ENVIRONMENT }}" >> $GITHUB_OUTPUT
+        fi
+        if [[ ${{ env.ENVIRONMENT }} =~ ^(prod)$ ]]; then  
+          echo "AWS_ACCOUNT=${{ inputs.AWS_ACCOUNT_PROD }}" >> $GITHUB_OUTPUT
+          echo "AWS_REGION=${{ inputs.AWS_REGION }}" >> $GITHUB_OUTPUT
+          echo "ENVIRONMENT=${{ env.ENVIRONMENT }}" >> $GITHUB_OUTPUT
+          echo "GH_ENVIRONMENT=${{ env.GH_ENVIRONMENT }}" >> $GITHUB_OUTPUT
+        fi                
+
+  TerraformAction:
+    name: Run Terraform Action ${{ inputs.ACTION }} 
+    runs-on: dim-dsre-runner-prod
+    needs: 
+      - EnvSetup    
+    environment:
+      name: ${{ needs.EnvSetup.outputs.GH_ENVIRONMENT }}
+    steps: 
+    - name: Checkout    
+      uses: actions/checkout@v3
+
+    - name: Environment Variable Verification    
+      run: |
+        echo ${{ needs.EnvSetup.outputs.AWS_ACCOUNT }}
+        echo ${{ needs.EnvSetup.outputs.AWS_REGION }}    
+        echo ${{ needs.EnvSetup.outputs.ENVIRONMENT }}
+        echo ${{ needs.EnvSetup.outputs.GH_ENVIRONMENT }}       
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        role-to-assume: arn:aws:iam::${{ needs.EnvSetup.outputs.AWS_ACCOUNT }}:role/${{ inputs.AWS_ASSUME_ROLE }}
+        aws-region: ${{ needs.EnvSetup.outputs.AWS_REGION }}
+        role-session-name: GithubActions
+        role-duration-seconds: 3600
+        role-skip-session-tagging: true
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}        
+
+    - name: Install AWS CLI
+      run: |
+        if hash aws 2>/dev/null; then
+          echo "AWS CLI is installed!"
+        else
+          echo "AWS CLI is installing!"
+          curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" 
+          unzip awscliv2.zip > /dev/null
+          sudo sh ./aws/install
+        fi
+      shell: bash 
+
+    - name: Set GitHub Creds
+      run: |
+        git config --global url."https://${{ env.GITHUB_USERNAME }}:${{ env.GITHUB_TOKEN }}@github.com".insteadOf "https://github.com"
+        git config --global --list
+      shell: bash 
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3.0.0
+      with:
+        terraform_version: ${{  env.TERRAFORM_VERSION }}
+        terraform_wrapper: false
+
+    - name: Setup Terragrunt
+      uses: autero1/action-terragrunt@v1.1.0
+      with:
+        terragrunt_version: ${{ env.TERRAGRUNT_VERSION }}
+        token: ${{ env.GITHUB_TOKEN }}       
+        
+    - name: Terragrunt init
+      id: init 
+      run: |
+        terragrunt --terragrunt-working-dir vars/${{ needs.EnvSetup.outputs.ENVIRONMENT }} init -terragrunt-non-interactive
+      env:    
+        TF_VAR_region: ${{ needs.EnvSetup.outputs.AWS_REGION }}    
+         
+    - name: Terragrunt format
+      id: fmt 
+      run: |
+        terragrunt --terragrunt-working-dir vars/${{ needs.EnvSetup.outputs.ENVIRONMENT }} hclfmt --terragrunt-check --terragrunt-diff
+      env:    
+        TF_VAR_region: ${{ needs.EnvSetup.outputs.AWS_REGION }}  
+
+    - name: Terragrunt validate inputs 
+      run: |
+        terragrunt --terragrunt-working-dir vars/${{ needs.EnvSetup.outputs.ENVIRONMENT }} validate-inputs
+      env:    
+        TF_VAR_region: ${{ needs.EnvSetup.outputs.AWS_REGION }}      
+            
+    - name: Terragrunt Plan
+      if: ${{ inputs.ACTION == 'plan' }}    
+      id: plan    
+      run: |
+        terragrunt --terragrunt-working-dir vars/${{ needs.EnvSetup.outputs.ENVIRONMENT }} plan -out output.tfplan
+      env:    
+        TF_VAR_region: ${{ needs.EnvSetup.outputs.AWS_REGION }}  
+
+    - name: Run Terragrunt Plan output
+      if: ${{ inputs.ACTION == 'plan' }}     
+      run: |
+        terragrunt --terragrunt-working-dir vars/${{ needs.EnvSetup.outputs.ENVIRONMENT }} show -json  output.tfplan > tfplan.json
+        terragrunt --terragrunt-working-dir vars/${{ needs.EnvSetup.outputs.ENVIRONMENT }} show --no-color  output.tfplan  2>&1 > tfplan.txt
+      env:    
+        TF_VAR_region: ${{ needs.EnvSetup.outputs.AWS_REGION }}                    
+
+    - name: Update Pull request
+      uses: actions/github-script@v6
+      if: ${{ inputs.ACTION == 'plan' && github.event_name == 'pull_request' }}
+      with:
+        github-token: ${{ env.GITHUB_TOKEN }}
+        script: |
+          const fs = require("fs");
+          const plan = fs.readFileSync("tfplan.txt", "utf8");
+          const maxGitHubBodyCharacters = 65536;
+
+          function chunkSubstr(str, size) {
+            const numChunks = Math.ceil(str.length / size)
+            const chunks = new Array(numChunks)
+            for (let i = 0, o = 0; i < numChunks; ++i, o += size) {
+              chunks[i] = str.substr(o, size)
+            }
+            return chunks
+          }        
+          // Split the Terraform plan into chunks if it's too big and can't fit into the GitHub Action
+          var plans = chunkSubstr(plan, maxGitHubBodyCharacters); 
+          for (let i = 0; i < plans.length; i++) {
+            const output = `### ${{ inputs.plan-title }} Part # ${i + 1}
+            #### Terragrunt Format and Style 🖌\`${{ steps.fmt.outcome }}\`
+            #### Terragrunt Initialization ⚙️\`${{ steps.init.outcome }}\`
+            #### Terragrunt Plan 📖\`${{ steps.plan.outcome }}\`
+            <details><summary>Show Plan</summary>
+            \`\`\`\n
+            ${plans[i]}
+            \`\`\`
+            </details>
+            *Pusher: @${{ github.actor }}, Action: \`${{ github.event_name }}\`, Working Directory: \`${{ inputs.working-directory }}\`, Workflow: \`${{ github.workflow }}\`*`;   
+
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: output
+            })
+          }
+         
+    - name: Upload the Terragrunt Plan to Artifacts
+      uses: actions/upload-artifact@v4.0.0
+      if: ${{ inputs.ACTION == 'plan' }}
+      with:
+       name: tfplan_json
+       path: tfplan.json       
+
+    - name: Run Terragrunt Apply
+      if: ${{ inputs.ACTION == 'apply' }}  
+      id: apply  
+      run: |
+        terragrunt --terragrunt-working-dir vars/${{ needs.EnvSetup.outputs.ENVIRONMENT }} apply -auto-approve
+      env:    
+        TF_VAR_region: ${{ needs.EnvSetup.outputs.AWS_REGION }}         
