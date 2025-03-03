@@ -8,6 +8,9 @@ on:
         required: true
         type: string
 
+env: 
+  GITHUB_TOKEN: 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
+
 jobs:
   check_labels:
     name: Validate labels
@@ -24,7 +27,7 @@ jobs:
         id: checkLabel
         with:
           hasSome: ${{ inputs.VALID_LABELS }}
-          githubToken: '${{ secrets.GITHUB_TOKEN }}'
+          githubToken: '${{ env.GITHUB_TOKEN }}'
         continue-on-error: true
 
       - name: PR comment
