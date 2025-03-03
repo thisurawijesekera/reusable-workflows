@@ -59,7 +59,7 @@ jobs:
       uses: aws-actions/configure-aws-credentials@v2
       with:
         role-to-assume: arn:aws:iam::${{ needs.EnvSetup.outputs.AWS_ACCOUNT }}:role/${{ inputs.AWS_ASSUME_ROLE }}
-        aws-region: ${{ needs.EnvSetup.outputs.AWS_REGION }}
+        aws-region: ${{ inputs.AWS_REGION }}
         role-session-name: GithubActions
         role-duration-seconds: 3600
         role-skip-session-tagging: true
