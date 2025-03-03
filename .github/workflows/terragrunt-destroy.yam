@@ -1,0 +1,116 @@
+name: Terraform destory Action
+
+on:
+  workflow_call:
+    inputs:
+      AWS_ACCOUNT:
+        description: 'TS AWS Prod Account number'
+        required: true
+        type: string      
+      AWS_REGION:
+        description: 'TS AWS Region'
+        required: true
+        type: string              
+      AWS_ASSUME_ROLE:
+        description: 'TS AWS assume role'
+        required: true
+        type: string           
+      CLUSTER_NAME:         
+        description: 'Enter the name of the cluster to be destroyed'
+        required: false
+        type: string  
+      KUBERNETES:         
+        description: 'Whether this is resources are Kubernetes'
+        required: true
+        type: string 
+      ENVIRONMENT:         
+        description: 'Enter the name of the environment to be destroyed'
+        required: true
+        type: string         
+        
+        
+        
+env: 
+  TERRAFORM_VERSION: 1.6.5
+  TERRAGRUNT_VERSION: 0.53.8
+  
+jobs:
+  TerraformAction:
+    name: Run Terraform Action Destroy
+    runs-on: ubuntu-latest
+    steps: 
+    - name: Checkout    
+      uses: actions/checkout@v4   
+
+    - name: Checkout Destroy script
+      if: ${{ inputs.KUBERNETES == 'true' }}
+      uses: actions/checkout@v4
+      with:
+        repository: thisurawijesekera/reusable-workflows
+        ref: master
+        token: ${{ secrets.GITHUB_TOKEN }}
+        path: scripts
+        sparse-checkout: |
+          delete.sh
+        sparse-checkout-cone-mode: false    
+          
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        role-to-assume: arn:aws:iam::${{ needs.EnvSetup.outputs.AWS_ACCOUNT }}:role/${{ inputs.AWS_ASSUME_ROLE }}
+        aws-region: ${{ needs.EnvSetup.outputs.AWS_REGION }}
+        role-session-name: GithubActions
+        role-duration-seconds: 3600
+        role-skip-session-tagging: true
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+    - name: Install AWS CLI
+      run: |
+        if hash aws 2>/dev/null; then
+          echo "AWS CLI is installed!"
+        else
+          echo "AWS CLI is installing!"
+          curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" 
+          unzip awscliv2.zip > /dev/null
+          sudo sh ./aws/install
+        fi
+      shell: bash 
+
+    - name: Set GitHub Creds
+      run: |
+        git config --global url."https://${{ env.GITHUB_USERNAME }}:${{ env.GITHUB_TOKEN }}@github.com".insteadOf "https://github.com"
+        git config --global --list
+      shell: bash 
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3.0.0
+      with:
+        terraform_version: ${{  env.TERRAFORM_VERSION }}
+        terraform_wrapper: false
+
+    - name: Setup Terragrunt
+      uses: autero1/action-terragrunt@v1.1.0
+      with:
+        terragrunt_version: ${{ env.TERRAGRUNT_VERSION }}
+        token: ${{ env.GITHUB_TOKEN }}       
+        
+    - name: Terragrunt init
+      id: init 
+      run: |
+        terragrunt --terragrunt-working-dir vars/${{ inputs.ENVIRONMENT }} init -terragrunt-non-interactive
+      env:    
+        TF_VAR_region: ${{ inputs.AWS_REGION }}  
+            
+    - name: Run Kubernetes Destroy
+      if: ${{ inputs.KUBERNETES == 'true' }}
+      id: destroy-k8s  
+      run: |
+        bash ./scripts/scripts/delete.sh ${{ inputs.CLUSTER_NAME }} ${{ inputs.AWS_REGION }}
+        
+    - name: Run Terragrunt Destroy
+      id: destroy  
+      run: |
+        terragrunt --terragrunt-working-dir vars/${{ inputs.ENVIRONMENT }} destroy -auto-approve
+      env:    
+        TF_VAR_region: ${{ inputs.AWS_REGION }}
