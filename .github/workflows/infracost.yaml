@@ -13,13 +13,14 @@ on:
         type: string
 
 env: 
-  INFRACOST_API_KEY: ico-360Rjy3tlADYV9QsX5yUHSqaSIfpCGti
+  VAULT_URL: https://prod-vault.sysco.net
+  VAULT_NAMESPACE: DIM
 
 jobs:
   Infracost:
     name: Run Infracost
     runs-on: dim-dsre-runner-prod
-    steps:    
+    steps:
       - name: Download Terraform Plan JSON
         uses: actions/download-artifact@v4.0.0
         with:
@@ -29,7 +30,7 @@ jobs:
       - name: Setup Infracost
         uses: infracost/actions/setup@v3
         with:
-          api-key: ${{ env.INFRACOST_API_KEY }}
+          api-key: ${{ secrets.INFRACOST_API_KEY }}
 
       - name: Generate Infracost JSON
         run: |
