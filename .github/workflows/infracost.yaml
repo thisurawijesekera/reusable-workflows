@@ -29,7 +29,7 @@ jobs:
       - name: Setup Infracost
         uses: infracost/actions/setup@v3
         with:
-          api-key: ${{ secrets.INFRACOST_API_KEY }}
+          api-key: ${{ env.INFRACOST_API_KEY }}
 
       - name: Generate Infracost JSON
         run: |
