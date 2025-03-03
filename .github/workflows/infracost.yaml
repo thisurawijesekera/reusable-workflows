@@ -19,7 +19,7 @@ env:
 jobs:
   Infracost:
     name: Run Infracost
-    runs-on: dim-dsre-runner-prod
+    runs-on: ubuntu-latest
     steps:
       - name: Download Terraform Plan JSON
         uses: actions/download-artifact@v4.0.0
