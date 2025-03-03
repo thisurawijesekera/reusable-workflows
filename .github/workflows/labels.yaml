@@ -1,0 +1,40 @@
+name: Validate GitHub PR Labels
+
+on:
+  workflow_call:
+    inputs:
+      VALID_LABELS:
+        description: 'List of valid labels'
+        required: true
+        type: string
+
+jobs:
+  check_labels:
+    name: Validate labels
+    runs-on: ubuntu-latest
+    permissions: write-all        
+    steps:
+      - name: Setup python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10' # install the python version needed
+
+      - name: Check Label
+        uses: danielchabr/pr-labels-checker@v3.3
+        id: checkLabel
+        with:
+          hasSome: ${{ inputs.VALID_LABELS }}
+          githubToken: '${{ secrets.GITHUB_TOKEN }}'
+        continue-on-error: true
+
+      - name: PR comment
+        id: prComment
+        uses: github-actions-up-and-running/pr-comment@v1.0.1
+        with:
+          repo-token: '${{ secrets.GH_TOKEN }}'
+          message: add one of the following labels ${{ inputs.VALID_LABELS }}
+        if: ${{ steps.checkLabel.outputs.passed == 'false' || steps.checkLabel.outcome == 'failure' }}
+
+      - name: Fail Workflow on PR Comment
+        if: steps.prComment.outcome == 'success'
+        run: exit 1
