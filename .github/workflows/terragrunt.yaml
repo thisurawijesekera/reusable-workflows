@@ -115,7 +115,7 @@ jobs:
 
     - name: Set GitHub Creds
       run: |
-        git config --global url."https://${{ env.GITHUB_USERNAME }}:${{ env.GITHUB_TOKEN }}@github.com".insteadOf "https://github.com"
+        git config --global url."https://${{ env.GITHUB_USERNAME }}:${{ secrets.GITHUB_TOKEN }}@github.com".insteadOf "https://github.com"
         git config --global --list
       shell: bash 
 
@@ -129,7 +129,7 @@ jobs:
       uses: autero1/action-terragrunt@v1.1.0
       with:
         terragrunt_version: ${{ env.TERRAGRUNT_VERSION }}
-        token: ${{ env.GITHUB_TOKEN }}       
+        token: ${{ secrets.GITHUB_TOKEN }}       
         
     - name: Terragrunt init
       id: init 
@@ -171,7 +171,7 @@ jobs:
       uses: actions/github-script@v6
       if: ${{ inputs.ACTION == 'plan' && github.event_name == 'pull_request' }}
       with:
-        github-token: ${{ env.GITHUB_TOKEN }}
+        github-token: ${{ secrets.GITHUB_TOKEN }}
         script: |
           const fs = require("fs");
           const plan = fs.readFileSync("tfplan.txt", "utf8");
