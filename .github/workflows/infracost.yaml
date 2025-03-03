@@ -1,0 +1,49 @@
+name: Infracost
+
+on:
+  workflow_call:
+    inputs:
+      TF_PLAN_NAME:
+        description: 'Terraform plan output file name'
+        required: true
+        type: string    
+      TF_PLAN_PATH:
+        description: 'Terraform plan output file path'
+        required: true
+        type: string
+
+env: 
+  INFRACOST_API_KEY: ico-360Rjy3tlADYV9QsX5yUHSqaSIfpCGti
+
+jobs:
+  Infracost:
+    name: Run Infracost
+    runs-on: dim-dsre-runner-prod
+    steps:    
+      - name: Download Terraform Plan JSON
+        uses: actions/download-artifact@v4.0.0
+        with:
+          name: ${{ inputs.TF_PLAN_NAME }} 
+          path: ${{ inputs.TF_PLAN_PATH }} 
+
+      - name: Setup Infracost
+        uses: infracost/actions/setup@v3
+        with:
+          api-key: ${{ env.INFRACOST_API_KEY }}
+
+      - name: Generate Infracost JSON
+        run: |
+            infracost breakdown --path ${{ inputs.TF_PLAN_PATH }} \
+                              --format json \
+                              --out-file /tmp/infracost.json
+        working-directory: ${{ inputs.TF_PLAN_PATH }} 
+        continue-on-error: true
+
+      - name: Post Infracost comment
+        run: |
+            infracost comment github --path /tmp/infracost.json \
+                                   --repo $GITHUB_REPOSITORY \
+                                   --github-token ${{ github.token }} \
+                                   --pull-request ${{ github.event.pull_request.number }} \
+                                   --behavior update
+        continue-on-error: true                           
