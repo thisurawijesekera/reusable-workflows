@@ -15,7 +15,6 @@ jobs:
   check_labels:
     name: Validate labels
     runs-on: ubuntu-latest
-    permissions: write-all        
     steps:
       - name: Setup python
         uses: actions/setup-python@v4
