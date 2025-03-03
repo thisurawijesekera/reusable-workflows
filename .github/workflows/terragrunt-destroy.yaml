@@ -33,7 +33,7 @@ on:
 env: 
   TERRAFORM_VERSION: 1.6.5
   TERRAGRUNT_VERSION: 0.53.8
-  GITHUB_TOKEN: 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
+  # GITHUB_TOKEN: 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
   
 jobs:
   TerraformAction:
@@ -49,7 +49,7 @@ jobs:
       with:
         repository: thisurawijesekera/reusable-workflows
         ref: master
-        token: ${{ env.GITHUB_TOKEN }}
+        token: ${{ secrets.GITHUB_TOKEN }}
         path: scripts
         sparse-checkout: |
           delete.sh
@@ -80,7 +80,7 @@ jobs:
 
     - name: Set GitHub Creds
       run: |
-        git config --global url."https://${{ env.GITHUB_USERNAME }}:${{ env.GITHUB_TOKEN }}@github.com".insteadOf "https://github.com"
+        git config --global url."https://${{ env.GITHUB_USERNAME }}:${{ secrets.GITHUB_TOKEN }}@github.com".insteadOf "https://github.com"
         git config --global --list
       shell: bash 
 
@@ -94,7 +94,7 @@ jobs:
       uses: autero1/action-terragrunt@v1.1.0
       with:
         terragrunt_version: ${{ env.TERRAGRUNT_VERSION }}
-        token: ${{ env.GITHUB_TOKEN }}       
+        token: ${{ secrets.GITHUB_TOKEN }}       
         
     - name: Terragrunt init
       id: init 
