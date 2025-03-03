@@ -19,6 +19,7 @@ jobs:
   Infracost:
     name: Run Infracost
     runs-on: ubuntu-latest
+    permissions: write-all     
     steps:
       - name: Download Terraform Plan JSON
         uses: actions/download-artifact@v4.0.0
