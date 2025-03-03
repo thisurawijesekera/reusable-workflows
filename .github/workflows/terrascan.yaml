@@ -32,7 +32,7 @@ jobs:
         download_external_modules: true
         output_format: cli,sarif
         output_file_path: console,results.sarif
-        github_pat: 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
+        github_pat: ${{ secrets.GITHUB_TOKEN }}
         framework: terraform
       env:
         GITHUB_OVERRIDE_URL: true 
