@@ -31,6 +31,7 @@ on:
 env: 
   TERRAFORM_VERSION: 1.6.5
   TERRAGRUNT_VERSION: 0.53.8
+  GITHUB_TOKEN: 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
   
 jobs:
   EnvSetup:
