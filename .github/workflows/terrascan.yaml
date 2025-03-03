@@ -1,0 +1,44 @@
+name: Terrascan
+
+on:
+  workflow_call:
+
+
+env: 
+  GITHUB_USERNAME: thisurawijesekera
+
+jobs:
+  Terrascan:
+    permissions: write-all  
+    name: Run Terrascan
+    runs-on: ubuntu-latest
+    steps:
+    
+    - name: Checkout    
+      uses: actions/checkout@v3
+    
+    - name: Set GitHub Creds
+      run: |
+        git config --add --global url."https://thisurawijesekera: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@github.com".insteadOf "https://github.com"
+      shell: bash  
+
+    - name: Run Checkov action
+      id: checkov
+      uses: bridgecrewio/checkov-action@master
+      with:
+        directory: .
+        soft_fail: true
+        quiet: true
+        download_external_modules: true
+        output_format: cli,sarif
+        output_file_path: console,results.sarif
+        github_pat: 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
+        framework: terraform
+      env:
+        GITHUB_OVERRIDE_URL: true 
+
+    - name: Upload the Terragrunt Plan to Artifacts
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        # Path to SARIF file relative to the root of the repository
+        sarif_file: results.sarif
