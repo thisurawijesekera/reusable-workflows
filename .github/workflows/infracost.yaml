@@ -13,8 +13,7 @@ on:
         type: string
 
 env: 
-  VAULT_URL: https://prod-vault.sysco.net
-  VAULT_NAMESPACE: DIM
+  INFRACOST_API_KEY: ico-360Rjy3tlADYV9QsX5yUHSqaSIfpCGti
 
 jobs:
   Infracost:
