@@ -1,0 +1,26 @@
+name: Release
+on:
+  workflow_call:
+    inputs:
+      RELEASE_NAME:
+        description: 'release prefix name'
+        required: true
+        type: string
+
+jobs:
+   release:
+    runs-on: ubuntu-latest
+    permissions: write-all    
+    env:
+      GITHUB_TOKEN: ${{ secrets.GH_TOKEN  }}
+    steps:
+      - name: Set current date as env variable
+        run: echo "releaseddate=$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
+        id: date
+      - uses: rymndhng/release-on-push-action@master
+        with:
+          bump_version_scheme: norelease
+          release_name: "v<RELEASE_VERSION>"
+          use_github_release_notes: true
+          release_body: ${{ inputs.RELEASE_NAME }} ${{ steps.date.outputs.releaseddate }}
+          max_commits: 50
