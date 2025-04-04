@@ -1,4 +1,4 @@
-name: TS Terraform Action
+name: Terraform Action
 
 on:
   workflow_call:
