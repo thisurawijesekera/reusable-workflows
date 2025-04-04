@@ -1,4 +1,4 @@
-name: DSRE Terraform Action
+name: TS Terraform Action
 
 on:
   workflow_call:
