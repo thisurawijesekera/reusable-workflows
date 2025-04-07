@@ -127,3 +127,24 @@ else
     kubectl replace --raw "/api/v1/namespaces/$namespace/finalize" -f tempfile_modified.json
   done
 fi
+
+CRD_NAME="eniconfigs.crd.k8s.amazonaws.com"
+
+# Check if ENIConfig CRD exists
+if kubectl get crd "$CRD_NAME" >/dev/null 2>&1; then
+  echo "ENIConfig CRD found. Deleting ENIConfig resources..."
+
+  # Delete all ENIConfig resources
+  if kubectl get eniconfig >/dev/null 2>&1; then
+    kubectl delete eniconfig --all
+    echo "All ENIConfig resources deleted."
+  else
+    echo "No ENIConfig resources found."
+  fi
+
+  # Delete the CRD itself
+  kubectl delete crd "$CRD_NAME"
+  echo "ENIConfig CRD deleted."
+else
+  echo "ENIConfig CRD not found. Nothing to delete."
+fi
