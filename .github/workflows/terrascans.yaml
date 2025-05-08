@@ -1,0 +1,47 @@
+name: Terrascan
+
+on:
+  workflow_call:
+    inputs:
+      TYPE:
+        description: 'IaC type (helm, k8s, kustomize, terraform)'
+        required: true
+        type: string
+      VERSION:
+        description: 'IaC version (helm: v3, k8s: v1, kustomize: v3, terraform: v12, v14)'
+        required: true
+        type: string
+      POLICY:
+        description: 'Policy type (all, aws, azure, gcp, github, k8s)'
+        required: true
+        type: string
+      PATH:
+        description: 'Terraform directory path'
+        required: true
+        type: string
+
+jobs:
+  Terrascan:
+    name: Run Terrascan
+    runs-on: dim-dsre-runner-prod
+    steps:
+    - name: Checkout    
+      uses: actions/checkout@v3
+    
+    - name: Set GitHub Creds
+      run: |
+        git config --add --global url."https://${{ env.GITHUB_USERNAME }}:${{ env.GITHUB_TOKEN }}@github.com".insteadOf "https://github.com"
+      shell: bash  
+  
+    - name: Run Terrascan
+      id: terrascan
+      uses: tenable/terrascan-action@main
+      with:
+        iac_type: ${{ inputs.TYPE }}
+        scm_token: ${{ env.GITHUB_TOKEN }}
+        iac_version: ${{ inputs.VERSION }} 
+        policy_type: ${{ inputs.POLICY }} 
+        only_warn: true
+        non_recursive: true
+        iac_dir: ${{ inputs.PATH }}
+        skip_rules: "AC_AWS_0214"
