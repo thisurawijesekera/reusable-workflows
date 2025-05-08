@@ -1,0 +1,77 @@
+name: CD [TS-helm-charts] Release
+
+on:
+  workflow_call:
+    inputs:
+      REPO_URL:
+        description: 'helm repo url'
+        required: true
+        type: string  
+ 
+# env: 
+#   VAULT_URL: https://prod-vault.sysco.net
+#   VAULT_NAMESPACE: DIM
+ 
+jobs:
+  release:
+    permissions:
+     contents: write  
+    name: Release
+    runs-on: ubuntu-latest
+    steps:      
+    - name: Checkout
+      uses: actions/checkout@v4.1.0
+      with:
+        fetch-depth: 0 
+
+    - name: Checkout gh-pages
+      uses: actions/checkout@v2
+      with:
+        path: 'gh-pages'
+        ref: 'gh-pages'
+        fetch-depth: 0
+
+    - name: Configure Git
+      run: |
+        git config user.name "$GITHUB_ACTOR"
+        git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
+        
+    - name: Install Helm
+      uses: azure/setup-helm@v3.5
+
+    - name: Install helm-docs
+      run: |
+        cd /tmp
+        wget https://github.com/norwoodj/helm-docs/releases/download/v1.11.3/helm-docs_1.11.3_Linux_x86_64.tar.gz
+        tar -xvf helm-docs_1.11.3_Linux_x86_64.tar.gz
+        sudo mv helm-docs /usr/bin/
+
+    - name: Run helm-docs
+      run: |
+          ls
+          helm-docs -t README.gotmpl
+        
+    - name: Run chart-releaser
+      id: chart-releaser    
+      uses: helm/chart-releaser-action@v1.5.0 
+      with:
+        config: "./.github/configs/cr.yaml"
+      env:
+        CR_TOKEN: "${{ github.token }}"   
+
+    - name: Copy Package Files to gh-pages
+      shell: bash
+      run: |
+          cp .cr-release-packages/* gh-pages/
+
+    - name: Push Package Files to gh-pages
+      shell: bash
+      working-directory: gh-pages
+      run: |
+          git pull
+          helm repo index . --url  ${{ inputs.REPO_URL }}
+          git config user.name "$GITHUB_ACTOR"
+          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"               
+          git add .
+          git commit -m "Updated from ref: $GITHUB_SHA"
+          git push     
