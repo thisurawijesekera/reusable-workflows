@@ -20,17 +20,20 @@ on:
         required: true
         type: string
 
+env: 
+  GITHUB_USERNAME: thisurawijesekera
+
 jobs:
   Terrascan:
     name: Run Terrascan
-    runs-on: dim-dsre-runner-prod
+    runs-on: ubuntu-latest
     steps:
     - name: Checkout    
       uses: actions/checkout@v3
     
     - name: Set GitHub Creds
       run: |
-        git config --add --global url."https://${{ env.GITHUB_USERNAME }}:${{ env.GITHUB_TOKEN }}@github.com".insteadOf "https://github.com"
+        git config --add --global url."https://${{ env.GITHUB_USERNAME }}:${{ secrets.GH_TOKEN }}@github.com".insteadOf "https://github.com"
       shell: bash  
   
     - name: Run Terrascan
@@ -38,7 +41,7 @@ jobs:
       uses: tenable/terrascan-action@main
       with:
         iac_type: ${{ inputs.TYPE }}
-        scm_token: ${{ env.GITHUB_TOKEN }}
+        scm_token: ${{ secrets.GH_TOKEN }}
         iac_version: ${{ inputs.VERSION }} 
         policy_type: ${{ inputs.POLICY }} 
         only_warn: true
